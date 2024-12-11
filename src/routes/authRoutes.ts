@@ -1,6 +1,7 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import * as authController from "../controllers/authController";
 import * as locationController from "../controllers/locationController";
+import * as eventController from "../controllers/eventController";
 
 const router = express.Router();
 
@@ -17,5 +18,8 @@ router.get("/locations", locationController.getLocations);
 router.post("/verify-email", authController.verifyEmail);
 router.put("/profile/:id", authController.updateProfile);
 router.put("/update-password/:id", authController.updatePassword);
+router.get("/users", authController.getAllUsers);
+router.post("/events", eventController.createEvent);
+router.get("/events", eventController.getEventsForUser);
 
 export default router;

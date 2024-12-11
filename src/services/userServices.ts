@@ -172,3 +172,26 @@ export async function updateUser(
     throw new Error("Database error during user update");
   }
 }
+
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    const query = `
+      SELECT 
+        id, 
+        username, 
+        email, 
+        phone_number AS "phoneNumber", 
+        address, 
+        dob, 
+        image, 
+        subscription, 
+        trial_end_date AS "trialEndDate"
+      FROM users
+    `;
+    const { rows } = await pool.query(query);
+    return rows;
+  } catch (error) {
+    console.error("Error fetching all users:", error);
+    throw new Error("Database error during fetching users");
+  }
+}

@@ -501,3 +501,13 @@ export async function updatePassword(
     res.status(500).json({ message: "Error updating password" });
   }
 }
+
+export async function getAllUsers(req: Request, res: Response): Promise<void> {
+  try {
+    const users = await userService.getAllUsers();
+    res.status(200).json({ message: "Users fetched successfully", users });
+  } catch (error) {
+    console.error("Error in getAllUsers API:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
