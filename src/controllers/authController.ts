@@ -141,7 +141,6 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     const user = await userService.getUserByEmail(email);
-
     if (!user) {
       res.status(400).json({ message: "Invalid email" });
       return;
@@ -173,11 +172,13 @@ export async function login(req: Request, res: Response): Promise<void> {
       httpOnly: true,
       secure: false,
       maxAge: 3600000,
+      sameSite: "lax",
     });
 
     res.json({
       message: "Logged in successfully",
       user: req.session.user,
+      token,
     });
   } catch (error) {
     console.error("Error in login:", error);
@@ -566,5 +567,45 @@ export async function forgotPassword(
   } catch (error) {
     console.error("Error in forgot password:", error);
     res.status(500).json({ message: "Server error" });
+  }
+}
+
+// Profile API
+export async function getProfile(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = 1;
+
+    console.log("userId", userId);
+    console.log("req.session.user", req.session);
+
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized: No user logged in" });
+      return;
+    }
+
+    const user = await userService.getUserById(Number(userId));
+
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "User profile retrieved successfully",
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        subscription: user.subscription,
+        trialEndDate: user.trial_end_date,
+        image: user.image,
+        phone_number: user.phone_number,
+        dob: user.dob,
+        address: user.address,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    res.status(500).json({ message: "Error fetching user profile" });
   }
 }

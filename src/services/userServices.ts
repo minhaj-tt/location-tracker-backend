@@ -47,7 +47,16 @@ export async function getUserById(id: number): Promise<User | null> {
   }
 
   const query = `
-    SELECT id, username, email, image, subscription, trial_end_date
+    SELECT 
+      id, 
+      username, 
+      email, 
+      phone_number AS "phoneNumber", 
+      address, 
+      dob, 
+      image, 
+      subscription, 
+      trial_end_date AS "trialEndDate"
     FROM users
     WHERE id = $1
   `;
