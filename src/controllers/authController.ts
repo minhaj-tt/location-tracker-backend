@@ -6,7 +6,10 @@ import multer from "multer";
 import path from "path";
 import moment from "moment";
 import Stripe from "stripe";
-import { sendVerificationEmail } from "../services/emailService";
+import {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "../services/emailService";
 
 declare module "express-session" {
   interface SessionData {
@@ -44,6 +47,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// Register API
 export const register = [
   upload.single("image"),
   async (req: Request, res: Response): Promise<void> => {
@@ -126,6 +130,7 @@ export const register = [
   },
 ];
 
+// Login API
 export async function login(req: Request, res: Response): Promise<void> {
   try {
     const { email, password } = req.body;
@@ -180,6 +185,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
 }
 
+// Upgrade Subbscription API
 export async function upgradeSubscription(
   req: Request,
   res: Response
@@ -212,6 +218,7 @@ export async function upgradeSubscription(
   }
 }
 
+// Cancel Subbscription API
 export async function cancelSubscription(
   req: Request,
   res: Response
@@ -238,6 +245,7 @@ export async function cancelSubscription(
   }
 }
 
+// Create Stripe Checkout Session API
 export async function createStripeCheckoutSession(
   req: Request,
   res: Response
@@ -286,6 +294,7 @@ export async function createStripeCheckoutSession(
   }
 }
 
+// Create Logout API
 export function logout(req: Request, res: Response): void {
   req.session.destroy((err) => {
     if (err) {
@@ -298,6 +307,7 @@ export function logout(req: Request, res: Response): void {
   });
 }
 
+// Location API
 const locations = [
   {
     id: 1,
@@ -331,6 +341,7 @@ export async function getLocations(req: Request, res: Response): Promise<void> {
   }
 }
 
+// Verify Email API
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
   try {
     const { token } = req.body;
@@ -381,6 +392,7 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
   }
 }
 
+// Update Profile API
 export const updateProfile = [
   upload.single("image"),
   async (req: Request, res: Response): Promise<void> => {
@@ -447,6 +459,7 @@ export const updateProfile = [
   },
 ];
 
+// Update Password API
 export async function updatePassword(
   req: Request,
   res: Response
@@ -502,12 +515,56 @@ export async function updatePassword(
   }
 }
 
+// User API
 export async function getAllUsers(req: Request, res: Response): Promise<void> {
   try {
     const users = await userService.getAllUsers();
     res.status(200).json({ message: "Users fetched successfully", users });
   } catch (error) {
     console.error("Error in getAllUsers API:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+}
+
+// Forgot Password API
+export async function forgotPassword(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ message: "Email is required" });
+      return;
+    }
+
+    const user = await userService.getUserByEmail(email);
+
+    if (!user) {
+      res.status(400).json({ message: "User with this email does not exist" });
+      return;
+    }
+
+    const resetToken = jwt.sign({ userId: user.id }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+
+    try {
+      await sendPasswordResetEmail(email, resetLink);
+      res.status(200).json({
+        message: "Password reset email sent successfully",
+      });
+    } catch (emailError) {
+      console.error("Error sending password reset email:", emailError);
+      res.status(500).json({
+        message: "Failed to send password reset email",
+      });
+    }
+  } catch (error) {
+    console.error("Error in forgot password:", error);
     res.status(500).json({ message: "Server error" });
   }
 }

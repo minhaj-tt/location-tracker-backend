@@ -21,5 +21,6 @@ router.put("/update-password/:id", authController.updatePassword);
 router.get("/users", authController.getAllUsers);
 router.post("/events", eventController.createEvent);
 router.get("/events", eventController.getEventsForUser);
+router.post("/reset-passwordp", authController.forgotPassword);
 
 export default router;
