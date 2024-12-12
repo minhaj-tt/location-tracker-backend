@@ -551,12 +551,13 @@ export async function forgotPassword(
       expiresIn: "1h",
     });
 
-    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+    const resetLink = `http://localhost:5173/update-password?token=${resetToken}`;
 
     try {
       await sendPasswordResetEmail(email, resetLink);
       res.status(200).json({
-        message: "Password reset email sent successfully",
+        message:
+          "Password reset email sent successfully. Please check your email",
       });
     } catch (emailError) {
       console.error("Error sending password reset email:", emailError);
@@ -573,7 +574,7 @@ export async function forgotPassword(
 // Profile API
 export async function getProfile(req: Request, res: Response): Promise<void> {
   try {
-    const userId = 1;
+    const userId = 4;
 
     console.log("userId", userId);
     console.log("req.session.user", req.session);
@@ -607,5 +608,59 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
   } catch (error) {
     console.error("Error fetching user profile:", error);
     res.status(500).json({ message: "Error fetching user profile" });
+  }
+}
+
+// Update Password From Token API
+export async function updatePasswordFromToken(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const { token, newPassword } = req.body;
+
+    console.log("token", token, newPassword);
+
+    if (!token || !newPassword) {
+      res.status(400).json({ message: "Token and new password are required" });
+      return;
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = jwt.verify(token, JWT_SECRET) as { userId: string };
+    } catch (error) {
+      res.status(400).json({ message: "Invalid or expired token" });
+      return;
+    }
+
+    const userId = parseInt(decodedToken.userId, 10);
+
+    if (isNaN(userId)) {
+      res.status(400).json({ message: "Invalid user ID" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters long" });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const updatedUser = await userService.updateUser(userId, {
+      password: hashedPassword,
+    });
+    if (!updatedUser) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error("Error in update password:", error);
+    res.status(500).json({ message: "Server error" });
   }
 }
