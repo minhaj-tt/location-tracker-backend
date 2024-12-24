@@ -58,7 +58,7 @@ export async function getEventsForUser(
   res: Response
 ): Promise<void> {
   try {
-    const userId = "1";
+    const userId = req.params.userId || "1";
 
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
@@ -67,15 +67,55 @@ export async function getEventsForUser(
 
     const events = await eventService.getAllEvents();
 
-    const userEvents = events.filter((event) =>
-      event.attendees.some((attendee) => attendee === userId)
-    );
-
     res
       .status(200)
-      .json({ message: "Events fetched successfully", events: userEvents });
+      .json({ message: "Events fetched successfully", events: events });
   } catch (error) {
     console.error("Error in getEventsForUser API:", error);
     res.status(500).json({ message: "Server error" });
+  }
+}
+
+export async function editEvent(req: Request, res: Response): Promise<void> {
+  try {
+    const { eventId } = req.params;
+    const {
+      title,
+      start,
+      end,
+      attendees,
+    }: { title: string; start: string; end: string; attendees: number[] } =
+      req.body;
+
+    if (!title || !start || !end || !attendees || attendees.length === 0) {
+      res
+        .status(400)
+        .json({ message: "Invalid input: Missing required fields" });
+      return;
+    }
+
+    const startDatetime = new Date(start);
+    const endDatetime = new Date(end);
+
+    if (isNaN(startDatetime.getTime()) || isNaN(endDatetime.getTime())) {
+      res.status(400).json({ message: "Invalid datetime format" });
+      return;
+    }
+
+    const event = await eventService.editEvent(
+      parseInt(eventId),
+      title,
+      startDatetime,
+      endDatetime,
+      attendees
+    );
+
+    res.status(200).json({
+      message: "Event edited successfully",
+      event,
+    });
+  } catch (error) {
+    console.error("Error in editEvent:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 }

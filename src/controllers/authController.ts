@@ -440,8 +440,6 @@ export const updateProfile = [
         return;
       }
 
-      console.log("updatedUser", updatedUser);
-
       res.status(200).json({
         message: "Profile updated successfully",
         user: {
@@ -574,10 +572,7 @@ export async function forgotPassword(
 // Profile API
 export async function getProfile(req: Request, res: Response): Promise<void> {
   try {
-    const userId = 4;
-
-    console.log("userId", userId);
-    console.log("req.session.user", req.session);
+    const userId = 19;
 
     if (!userId) {
       res.status(401).json({ message: "Unauthorized: No user logged in" });
@@ -618,8 +613,6 @@ export async function updatePasswordFromToken(
 ): Promise<void> {
   try {
     const { token, newPassword } = req.body;
-
-    console.log("token", token, newPassword);
 
     if (!token || !newPassword) {
       res.status(400).json({ message: "Token and new password are required" });

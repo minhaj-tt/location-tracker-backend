@@ -127,8 +127,6 @@ export async function downgradeSubscription(
       return null;
     }
 
-    console.log("Subscription downgrade successful:", rows[0]);
-
     return rows[0];
   } catch (error) {
     console.error("Error downgrading subscription:", error);
@@ -172,8 +170,6 @@ export async function updateUser(
       console.error(`User with id ${userId} not found or update failed.`);
       return null;
     }
-
-    console.log("User update successful:", rows[0]);
 
     return rows[0];
   } catch (error) {

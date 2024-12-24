@@ -33,6 +33,11 @@ app.use(
     credentials: true,
   })
 );
+// Middleware to serve uploaded files
+app.use("/uploads", express.static("uploads"), () => {
+  console.log("Hello image here");
+});
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
