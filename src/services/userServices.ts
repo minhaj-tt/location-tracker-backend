@@ -1,5 +1,4 @@
-import pool from "../db";
-import { User } from "../models/users";
+import User from "../models/users"; 
 import moment from "moment";
 
 export async function registerUser(user: {
@@ -10,69 +9,61 @@ export async function registerUser(user: {
   address: string;
   dob: Date;
   image: string | null;
-  subscription: string;
+  subscription: "free_trial" | "standard" | "premium";
   trialEndDate: Date;
 }): Promise<User | null> {
-  const query = `
-    INSERT INTO users (username, email, password, phone_number, address, dob, image, subscription, trial_end_date)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING id, username, email, phone_number AS "phoneNumber", address, dob, image, subscription, trial_end_date AS "trialEndDate"
-  `;
-  const values = [
-    user.username,
-    user.email,
-    user.password,
-    user.phone_number,
-    user.address,
-    user.dob,
-    user.image,
-    user.subscription,
-    user.trialEndDate,
-  ];
-
-  const { rows } = await pool.query(query, values);
-  return rows[0];
+  try {
+    const newUser = await User.create({
+      username: user.username,
+      email: user.email,
+      password: user.password,
+      phone_number: user.phone_number,
+      address: user.address,
+      dob: user.dob,
+      image: user.image,
+      subscription: user.subscription,
+      trial_end_date: user.trialEndDate,
+    });
+    return newUser;
+  } catch (error) {
+    console.error("Error registering user:", error);
+    throw new Error("Failed to register user in the database");
+  }
 }
 
 export async function getUserByEmail(email: string): Promise<User | null> {
-  const query = `SELECT * FROM users WHERE email = $1`;
-  const { rows } = await pool.query(query, [email]);
-  return rows[0] || null;
+  try {
+    return await User.findOne({ where: { email } });
+  } catch (error) {
+    console.error(`Error fetching user by email (${email}):`, error);
+    throw new Error("Failed to fetch user by email");
+  }
 }
 
 export async function getUserById(id: number): Promise<User | null> {
-  if (isNaN(id) || id <= 0) {
-    console.error("Invalid user ID:", id);
-    throw new Error("Invalid user ID");
+  if (!id || isNaN(id)) {
+    throw new Error("Invalid user ID provided");
   }
 
-  const query = `
-    SELECT 
-      id, 
-      username, 
-      email, 
-      phone_number AS "phoneNumber", 
-      address, 
-      dob, 
-      image, 
-      subscription, 
-      trial_end_date AS "trialEndDate"
-    FROM users
-    WHERE id = $1
-  `;
-
   try {
-    const { rows } = await pool.query(query, [id]);
-
-    if (rows.length === 0) {
-      console.warn(`User with ID ${id} not found`);
-      return null;
-    }
-
-    return rows[0] as User;
+    const user = await User.findOne({
+      where: { id },
+      attributes: [
+        "id",
+        "username",
+        "email",
+        "phone_number",
+        "address",
+        "dob",
+        "image",
+        "subscription",
+        "trial_end_date",
+      ],
+    });
+    return user;
   } catch (error) {
-    console.error("Error fetching user by ID:", error);
-    throw new Error("Database query failed");
+    console.error(`Error fetching user by ID (${id}):`, error);
+    throw new Error("Failed to fetch user by ID");
   }
 }
 
@@ -85,52 +76,59 @@ export async function upgradeSubscription(
       ? moment().add(1, "month").toDate()
       : moment().add(1, "year").toDate();
 
-  const query = `
-    UPDATE users 
-    SET subscription = $1, trial_end_date = $2 
-    WHERE id = $3 
-    RETURNING id, username, email, image, subscription, trial_end_date
-  `;
-  const { rows } = await pool.query(query, [
-    newSubscription,
-    newEndDate,
-    userId,
-  ]);
+  try {
+    const [updatedCount, updatedUsers] = await User.update(
+      {
+        subscription: newSubscription,
+        trial_end_date: newEndDate,
+      },
+      {
+        where: { id: userId },
+        returning: true,
+      }
+    );
 
-  return rows[0] || null;
+    return updatedCount > 0 ? updatedUsers[0] : null;
+  } catch (error) {
+    console.error(`Error upgrading subscription for user ID ${userId}:`, error);
+    throw new Error("Failed to upgrade subscription");
+  }
 }
 
 export async function hasTrialEnded(userId: number): Promise<boolean> {
-  const query = `SELECT trial_end_date FROM users WHERE id = $1`;
-  const { rows } = await pool.query(query, [userId]);
-  const trialEndDate = rows[0]?.trial_end_date;
-  if (trialEndDate) {
-    return moment().isAfter(moment(trialEndDate));
+  try {
+    const user = await User.findOne({
+      where: { id: userId },
+      attributes: ["trial_end_date"],
+    });
+    return user && user.trial_end_date
+      ? moment().isAfter(user.trial_end_date)
+      : false;
+  } catch (error) {
+    console.error(`Error checking trial status for user ID ${userId}:`, error);
+    throw new Error("Failed to check trial end status");
   }
-  return false;
 }
 
 export async function downgradeSubscription(
   userId: number
 ): Promise<User | null> {
   try {
-    const query = `
-      UPDATE users 
-      SET subscription = 'free', trial_end_date = NULL 
-      WHERE id = $1 
-      RETURNING id, username, email, image, subscription, trial_end_date
-    `;
-    const { rows } = await pool.query(query, [userId]);
+    const [updatedCount, updatedUsers] = await User.update(
+      { subscription: "free_trial", trial_end_date: undefined },
+      {
+        where: { id: userId },
+        returning: true,
+      }
+    );
 
-    if (rows.length === 0) {
-      console.error(`User with id ${userId} not found or update failed.`);
-      return null;
-    }
-
-    return rows[0];
+    return updatedCount > 0 ? updatedUsers[0] : null;
   } catch (error) {
-    console.error("Error downgrading subscription:", error);
-    throw new Error("Database error during subscription downgrade");
+    console.error(
+      `Error downgrading subscription for user ID ${userId}:`,
+      error
+    );
+    throw new Error("Failed to downgrade subscription");
   }
 }
 
@@ -138,65 +136,40 @@ export async function updateUser(
   userId: number | undefined,
   updates: Partial<User>
 ): Promise<User | null> {
+  if (!userId) {
+    throw new Error("User ID is required for update");
+  }
+
   try {
-    const fields: string[] = [];
-    const values: any[] = [];
-    let index = 1;
+    const [updatedCount, updatedUsers] = await User.update(updates, {
+      where: { id: userId },
+      returning: true,
+    });
 
-    for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined) {
-        fields.push(`${key} = $${index}`);
-        values.push(value);
-        index++;
-      }
-    }
-
-    if (fields.length === 0) {
-      throw new Error("No fields provided for update");
-    }
-
-    values.push(userId);
-
-    const query = `
-      UPDATE users
-      SET ${fields.join(", ")}
-      WHERE id = $${index}
-      RETURNING id, username, email, image, subscription, trial_end_date, dob, address, phone_number
-    `;
-
-    const { rows } = await pool.query(query, values);
-
-    if (rows.length === 0) {
-      console.error(`User with id ${userId} not found or update failed.`);
-      return null;
-    }
-
-    return rows[0];
+    return updatedCount > 0 ? updatedUsers[0] : null;
   } catch (error) {
-    console.error("Error updating user:", error);
-    throw new Error("Database error during user update");
+    console.error(`Error updating user ID ${userId}:`, error);
+    throw new Error("Failed to update user information");
   }
 }
 
 export async function getAllUsers(): Promise<User[]> {
   try {
-    const query = `
-      SELECT 
-        id, 
-        username, 
-        email, 
-        phone_number AS "phoneNumber", 
-        address, 
-        dob, 
-        image, 
-        subscription, 
-        trial_end_date AS "trialEndDate"
-      FROM users
-    `;
-    const { rows } = await pool.query(query);
-    return rows;
+    return await User.findAll({
+      attributes: [
+        "id",
+        "username",
+        "email",
+        "phone_number",
+        "address",
+        "dob",
+        "image",
+        "subscription",
+        "trial_end_date",
+      ],
+    });
   } catch (error) {
     console.error("Error fetching all users:", error);
-    throw new Error("Database error during fetching users");
+    throw new Error("Failed to fetch users");
   }
 }

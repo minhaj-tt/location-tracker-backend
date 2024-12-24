@@ -1,7 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import pool from "./db";
+import sequelize from "./config/sequelize"; 
 import authRoutes from "./routes/authRoutes";
 import bodyParser from "body-parser";
 import session from "express-session";
@@ -24,6 +24,15 @@ const io = new Server(server, {
   },
 });
 
+sequelize
+  .sync({ force: false }) 
+  .then(() => {
+    console.log("Database & tables synced successfully.");
+  })
+  .catch((error) => {
+    console.error("Error syncing database: ", error);
+  });
+
 // Middlewares
 app.use(
   cors({
@@ -35,7 +44,7 @@ app.use(
 );
 // Middleware to serve uploaded files
 app.use("/uploads", express.static("uploads"), () => {
-  console.log("Hello image here");
+  console.log("Serving uploaded files from /uploads");
 });
 
 app.use(bodyParser.json());
@@ -64,10 +73,8 @@ app.get("/", (_req, res) => {
 
 app.get("/test-db", async (_req, res) => {
   try {
-    const client = await pool.connect();
-    const result = await client.query("SELECT NOW()");
-    res.json({ success: true, time: result.rows[0].now });
-    client.release();
+    await sequelize.authenticate();
+    res.json({ success: true, message: "Database connection successful!" });
   } catch (error) {
     console.error("Database connection error", error);
     res
@@ -81,18 +88,21 @@ io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
   // Emit notifications to connected clients
-  setInterval(() => {
+  const sendNotification = () => {
     const notification = {
       title: "Notification Title",
       message: "This is a static notification.",
       timestamp: new Date(),
     };
     socket.emit("notification", notification);
-  }, 5000);
+  };
+
+  const notificationInterval = setInterval(sendNotification, 5000);
 
   // Handle disconnection
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
+    clearInterval(notificationInterval); // Clean up interval on disconnection
   });
 });
 

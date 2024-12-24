@@ -1,4 +1,5 @@
-import pool from "../db";
+import Event from "../models/event";
+import User from "../models/users";
 
 export async function createEvent(
   title: string,
@@ -12,38 +13,31 @@ export async function createEvent(
   end: string;
   attendees: number[];
 }> {
-  const client = await pool.connect();
-
   try {
-    await client.query("BEGIN");
-
-    const eventQuery = `
-      INSERT INTO events (title, start_datetime, end_datetime)
-      VALUES ($1, $2, $3)
-      RETURNING id, title, start_datetime AS "start", end_datetime AS "end"
-    `;
-    const { rows: eventResult } = await client.query(eventQuery, [
+    const event = await Event.create({
       title,
-      startDatetime,
-      endDatetime,
-    ]);
-    const event = eventResult[0];
+      start_datetime: startDatetime,
+      end_datetime: endDatetime,
+    });
 
-    const attendeeQuery = `
-      INSERT INTO event_attendees (event_id, user_id)
-      VALUES ($1, unnest($2::int[]))
-    `;
-    await client.query(attendeeQuery, [event.id, attendeeIds]);
+    const attendees = await User.findAll({
+      where: {
+        id: attendeeIds,
+      },
+    });
 
-    await client.query("COMMIT");
+    await event.addUsers(attendees);
 
-    return { ...event, attendees: attendeeIds };
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.start_datetime.toISOString(),
+      end: event.end_datetime.toISOString(),
+      attendees: attendeeIds,
+    };
   } catch (error) {
-    await client.query("ROLLBACK");
     console.error("Error creating event:", error);
     throw new Error("Failed to create event");
-  } finally {
-    client.release();
   }
 }
 
@@ -56,51 +50,32 @@ export async function getAllEvents(): Promise<
     attendees: { id: number; name: string | null }[];
   }[]
 > {
-  const client = await pool.connect();
-
   try {
-    const eventsQuery = `
-      SELECT 
-        e.id, 
-        e.title, 
-        e.start_datetime AS "start", 
-        e.end_datetime AS "end"
-      FROM events e
-    `;
-    const { rows: events } = await client.query(eventsQuery);
-
-    if (events.length === 0) {
-      return [];
-    }
-
-    const attendeesQuery = `
-      SELECT 
-        ea.event_id, 
-        ea.user_id AS id, 
-        u.name 
-      FROM event_attendees ea
-      LEFT JOIN users u ON ea.user_id = u.id
-    `;
-    const { rows: attendees } = await client.query(attendeesQuery);
-
-    return events.map((event) => {
-      const eventAttendees = attendees
-        .filter((attendee) => attendee.event_id === event.id)
-        .map((attendee) => ({
-          id: attendee.id,
-          name: attendee.name,
-        }));
-
-      return {
-        ...event,
-        attendees: eventAttendees.length > 0 ? eventAttendees : [],
-      };
+    const events = await Event.findAll({
+      include: [
+        {
+          model: User,
+          attributes: ["id", "username"],
+          through: { attributes: [] },
+        },
+      ],
     });
+
+    return events.map((event) => ({
+      id: event.id,
+      title: event.title,
+      start: event.start_datetime.toISOString(),
+      end: event.end_datetime.toISOString(),
+      attendees: event.users
+        ? event.users.map((user: any) => ({
+            id: user.id,
+            name: user.username,
+          }))
+        : [],
+    }));
   } catch (error) {
     console.error("Error fetching events:", error);
     throw new Error("Failed to fetch events");
-  } finally {
-    client.release();
   }
 }
 
@@ -117,44 +92,33 @@ export async function editEvent(
   end: string;
   attendees: number[];
 }> {
-  const client = await pool.connect();
-
   try {
-    await client.query("BEGIN");
+    const event = await Event.findByPk(eventId);
+    if (!event) throw new Error("Event not found");
 
-    const eventQuery = `
-      UPDATE events 
-      SET title = $1, start_datetime = $2, end_datetime = $3 
-      WHERE id = $4 
-      RETURNING id, title, start_datetime AS "start", end_datetime AS "end"
-    `;
-    const { rows: eventResult } = await client.query(eventQuery, [
-      title,
-      startDatetime,
-      endDatetime,
-      eventId,
-    ]);
-    const event = eventResult[0];
+    event.title = title;
+    event.start_datetime = startDatetime;
+    event.end_datetime = endDatetime;
+    await event.save();
 
-    const removeAttendeesQuery = `
-      DELETE FROM event_attendees WHERE event_id = $1
-    `;
-    await client.query(removeAttendeesQuery, [eventId]);
+    await event.setUsers([]); 
 
-    const attendeeQuery = `
-      INSERT INTO event_attendees (event_id, user_id)
-      VALUES ($1, unnest($2::int[]))
-    `;
-    await client.query(attendeeQuery, [event.id, attendeeIds]);
+    const attendees = await User.findAll({
+      where: {
+        id: attendeeIds,
+      },
+    });
+    await event.addUsers(attendees);
 
-    await client.query("COMMIT");
-
-    return { ...event, attendees: attendeeIds };
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.start_datetime.toISOString(),
+      end: event.end_datetime.toISOString(),
+      attendees: attendeeIds,
+    };
   } catch (error) {
-    await client.query("ROLLBACK");
     console.error("Error editing event:", error);
     throw new Error("Failed to edit event");
-  } finally {
-    client.release();
   }
 }

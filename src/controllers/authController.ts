@@ -163,7 +163,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       subscription: user.subscription,
       trialEndDate: user.trial_end_date,
       image: user.image,
-      phone_number: user.phone_number,
+      phone_number: parseInt(user.phone_number, 10),
       dob: user.dob,
       address: user.address,
     };
@@ -424,7 +424,7 @@ export const updateProfile = [
         username: string;
         dob?: any;
         address?: any;
-        phone_number?: number;
+        phone_number?: string;
         image?: string;
       } = { username };
 
