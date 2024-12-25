@@ -1,13 +1,14 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import sequelize from "./config/sequelize"; 
+import sequelize from "./config/sequelize";
 import authRoutes from "./routes/authRoutes";
 import bodyParser from "body-parser";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import { Server } from "socket.io";
 import http from "http";
+import { associateModels } from "./models/associations";
 
 dotenv.config();
 
@@ -24,8 +25,10 @@ const io = new Server(server, {
   },
 });
 
+associateModels();
+
 sequelize
-  .sync({ force: false }) 
+  .sync({ force: false })
   .then(() => {
     console.log("Database & tables synced successfully.");
   })

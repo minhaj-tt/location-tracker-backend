@@ -1,7 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import sequelize from "../config/sequelize";
 import User from "./users";
-import EventAttendees from "./eventAttendees"; 
 
 interface EventAttributes {
   id: number;
@@ -55,12 +54,5 @@ Event.init(
     modelName: "Event",
   }
 );
-
-// Event.belongsToMany(User, { through: "EventUsers" });
-Event.belongsToMany(User, {
-  through: EventAttendees,
-  foreignKey: "event_id",
-  otherKey: "user_id",
-});
 
 export default Event;

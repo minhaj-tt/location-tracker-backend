@@ -55,6 +55,7 @@ export async function getAllEvents(): Promise<
       include: [
         {
           model: User,
+          as: "users",
           attributes: ["id", "username"],
           through: { attributes: [] },
         },
@@ -101,7 +102,7 @@ export async function editEvent(
     event.end_datetime = endDatetime;
     await event.save();
 
-    await event.setUsers([]); 
+    await event.setUsers([]);
 
     const attendees = await User.findAll({
       where: {

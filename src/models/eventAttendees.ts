@@ -8,11 +8,6 @@ class EventAttendees extends Model {
 
 EventAttendees.init(
   {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true,
-    },
     user_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -32,8 +27,8 @@ EventAttendees.init(
   },
   {
     sequelize,
-    modelName: "EventAttendees",
     tableName: "event_attendees",
+    modelName: "EventAttendees",
   }
 );
 
